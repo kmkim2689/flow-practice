@@ -93,7 +93,9 @@
       * 다만, collectLatest는 단일 발행 시 실행되는 블록에서 구현한 코드가 모두 수행되는 데 오랜 시간이 걸리는 동안(즉 아직 코드의 실행이 끝나지 않은 상태에서)
       * 새로운 발행이 들어오게 된다면, 블록 내부의 코드 실행은 취소된다. 새로운 발행에 대해 다시 코드가 실행된다.
 
-* Flow Operators
+---
+
+### Flow Operators
   * to transform the emissions
   * mainly used operators
     * collect / collectLatest : 데이터를 발행받음 
@@ -232,3 +234,30 @@
 
   * conflate : 'skip entirely' if previous collect is not finished
   * collectLatest : 'suspend and skip' if previous collect is not yet finished
+
+---
+
+### NormalFlow vs StateFlow vs SharedFlow
+* StateFlow - kind of Hot Flow
+  * used to keep state in a Flow
+  * just like a livedata **without the lifecycle awareness** so, an Activity cannot detect
+  * the state flow can't detect when the activity goes in the background
+  * Collect 이전에 발행된 값들은 알 수 없음
+  * change -> stateflow exactly keep one single value -> Hot Flow
+    변화가 발생하면, 이전의 값은 사라지고 오직 하나의 값만을 보유
+  * 다만, Compose 사용 시 stateFlow 사용은 권장하지 않음. -> compose에 collectAsState기능이 이미 존재하기 때문
+  
+* Hot Flow vs Cold Flow
+  * Cold Flow : if there are no collectors, the flow won't do anything
+  * Hot Flow : Even if there no collectors the flow will do something
+    * if we assign a new value to stateFlow, can change that value even if there are no collectors
+
+* SharedFlow - Hot Flow
+  * used to send one-time event
+  * two types of emissions
+    * state emission : with StateFlow
+    * event emission : with SharedFlow
+      * only receive a single time
+      * ex) showing snackbar, login successful => must only once
+  * can work with multiple collectors
+  * with **replay**, can cache

@@ -3,7 +3,11 @@ package com.example.flow_practice
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
@@ -44,10 +48,56 @@ class MainViewModel: ViewModel() {
         }
     }
 
+    // stateflow
+    private val _stateFlow = MutableStateFlow(0)
+    // to collect changes from _stateFlow
+    val stateFlow = _stateFlow.asStateFlow()
+
+    // sharedFlow -> initial value not needed : event이므로
+    private val _sharedFlow = MutableSharedFlow<Int>()
+    val sharedFlow = _sharedFlow.asSharedFlow()
+
     // as the viewmodel is initialized
     init {
-        collectFlow()
+//        collectFlow()
+        // nothing happens as it is a hot flow
+        // squareNum(3)
+        viewModelScope.launch {
+            sharedFlow.collect {
+                delay(2000L)
+                println("FLOW1 : The received num is $it")
+
+            }
+        }
+
+        // only first flow prints the result
+        // squareNum(3)
+
+        viewModelScope.launch {
+            sharedFlow.collect {
+                delay(3000L)
+                println("FLOW2 : The received num is $it")
+
+            }
+        }
+
+        // both print the result
+        squareNum(3)
     }
+
+    // sharedFlow emit는 단 한 번만 수행 가능.
+    fun squareNum(number: Int) {
+        viewModelScope.launch {
+            _sharedFlow.emit(number * number)
+        }
+    }
+
+
+    fun incrementCounter() {
+        _stateFlow.value += 1
+    }
+
+
 
     // compose state 변수를 사용하지 않는 경우, collect 메소드 이용해서 값을 받아볼 수 있음
     // UI Layer에서는 collect() 사용하는 것은 지양. 더 쉬운 collectAsState를 사용
@@ -384,12 +434,14 @@ class MainViewModel: ViewModel() {
         }
         /*
         FLOW : appetizer is delivered
-Flow : eating appetizer
-FLOW : main dish is delivered
-FLOW : desert is delivered
-Flow : finished eating appetizer
-Flow : eating desert
-Flow : finished eating desert
+        Flow : eating appetizer
+        FLOW : main dish is delivered
+        FLOW : desert is delivered
+        Flow : finished eating appetizer
+        Flow : eating desert
+        Flow : finished eating desert
          */
     }
+
+
 }
