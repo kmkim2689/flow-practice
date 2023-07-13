@@ -93,4 +93,142 @@
       * 다만, collectLatest는 단일 발행 시 실행되는 블록에서 구현한 코드가 모두 수행되는 데 오랜 시간이 걸리는 동안(즉 아직 코드의 실행이 끝나지 않은 상태에서)
       * 새로운 발행이 들어오게 된다면, 블록 내부의 코드 실행은 취소된다. 새로운 발행에 대해 다시 코드가 실행된다.
 
-* Cold Flow vs Hot Flow
+* Flow Operators
+  * to transform the emissions
+  * mainly used operators
+    * collect / collectLatest : 데이터를 발행받음 
+    * filter
+      * 조건을 만족하는 데이터만 발행 -> 블록 구현부 내부에는 boolean expression
+      * true인 것만 발행받을(collect) 수 있음
+    * map
+      * 발행되는 각 데이터 하나하나를 같은 기준으로 변경
+      * 발행값을 받아 그 발행값을 가지고 다른 값으로 변형한 것을 발행
+    * onEach
+      * 하나하나 순회한다는 점에서 map와 동일
+      * 다만, doesn't really transform the values 
+      * 예시 : 단순 출력
+      * 그러면 collect와 다를 바가 없는 것인가? <No>
+        * onEach는 다시 Flow를 return한다. -> 이후에 다른 operator 사용 가능
+          /**
+          Returns a flow that invokes the given [action] **before** each value of the upstream flow is emitted downstream.
+          **/
+            public fun <T> Flow<T>.onEach(action: suspend (T) -> Unit): Flow<T> = transform { value ->
+            action(value)
+            return@transform emit(value)
+          }
+
+        * 반면 collect는 아무것도 return하지 않음. -> collect 쓰면 끝.
+          public suspend fun collect(collector: FlowCollector<T>)
+
+      * 둘은 같은 결과
+        countDownFlow.onEach {
+          println(it)
+        }.launchIn(viewModelScope)
+
+        viewModelScope.launch {
+          countDownFlow.collect {
+            println(it)
+          }
+        }
+
+  * terminal operators : terminate the flow - take the whole results of a flow -> all emissions together and then do something with these
+    * count : 발행되는 것들 중 특정 조건에 맞는 값의 수를 카운트
+      쓰는 순간 flow는 종료되며, return하는 것이 Flow가 아닌 Int.
+      즉, 마지막에 count를 쓰는 flow라면 어떤 변수에 할당되어야 함.
+
+      private fun collectFlow() {
+          viewModelScope.launch {
+              val count = countDownFlow
+                  .filter { time ->
+                      // boolean expression
+                      time % 2 == 0
+                  }
+                  .map { time ->
+                      // take the time value(for here, filtered value)
+                      // and use that to manipulate each value to another value
+                      time * time
+                  }
+                  .onEach { time ->
+                      println(time)
+                  }
+                  .count {
+                      // count를 쓰는 순간 flow는 종료되며, return하는 것이 flow가 아닌 Int.
+                      it % 2 == 0
+                  }
+      
+              println("count is $count")
+          }
+      }
+
+    * reduce
+      * every single emission
+      * parameter : accumulator, value
+      * accumulator : 이전까지 거쳐온 값들에 대한 연산 결과
+      * value : 현재 값
+      * 최종적으로 반환되는 것 : 마지막 순회에서 accumulator와 value에 대한 연산
+        
+    * fold
+      * 기본적으로 reduce와 유사
+      * 다만 reduce와 달리, 시작 accumulator값을 제공해주어야 함.(initial value)
+      * 초기값을 설정해주는 것 -> 초기 accumulator의 값을 설정해주는 것.
+
+  * Flattening Operators
+    * What is Flattening?
+      * ex) list of lists to single list
+        [[1, 2], [1, 2, 3]] -- flattening --> [1, 2, 1, 2, 3]
+      * 위와 같은 예시로 비유는 가능 -> 실제로 list를 flow로 대입하여 생각하면 됨
+      * **여러 개의 Flow를 합쳐 하나의 Flow**로 만드는 것을 Flattening한다고 보면 됨.
+    
+    * flatMap
+      * flatMapConcat : 여러개의 flow를 하나의 flow로 이어붙임
+      * flatMapMerge : 거의 사용되지 x
+        * flatMapConcat과의 차이
+        * 합쳐진 flow들이 동시에 실행되는 것이 Merge
+        * 합쳐진 순서대로 하나하나 실행되는 것이 Concat
+      * flatMapLatest : collectLatest의 원리와 비슷
+        * 앞의 것이 emit되는 동안 새로운 flow에 대한 요청이 들어오면 중단하고 새로운 것에 대해 emit 실시
+
+  * buffer
+    
+    private fun collectFlow() {
+    val flow = flow {
+        // 레스토랑에서 음식을 기다림
+        delay(200L)
+        // 에피타이저 나옴
+        emit("appetizer")
+        delay(1000L)
+        emit("main dish")
+        delay(100L)
+        emit("desert")
+    }
+
+    viewModelScope.launch {
+        flow.onEach {
+                println("FLOW : $it is delivered")
+            }
+            // emit되는 것들에 대해 collect가 각기 다른 코루틴에서 실행되도록 저장함
+            // 앞의 collect의 실행이 완료되지 않아도, 같이 진행
+            .buffer()
+            .collect {
+                println("Flow : eating $it")
+                // 먹는데 걸리는 시간
+                delay(1500L)
+                println("Flow : finished eating $it")
+            }
+        }
+        
+        식사가 더 빠르게 진행되었음
+        FLOW : appetizer is delivered
+        Flow : eating appetizer
+        FLOW : main dish is delivered
+        FLOW : desert is delivered
+        Flow : finished eating appetizer
+        Flow : eating main dish
+        Flow : finished eating main dish
+        Flow : eating desert
+        Flow : finished eating desert
+        
+    }
+
+  * conflate : 'skip entirely' if previous collect is not finished
+  * collectLatest : 'suspend and skip' if previous collect is not yet finished
