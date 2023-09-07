@@ -14,6 +14,9 @@
     > https://youtu.be/ZX8VsqNO_Ss
   * Android Developers
     > https://developer.android.com/kotlin/flow
+  * etc
+    > https://uzun.dev/138
+    > https://kwongdevelop.tistory.com/39
 
 ---
 
@@ -120,7 +123,7 @@
       * 다만, doesn't really transform the values 
       * 예시 : 단순 출력
       * 그러면 collect와 다를 바가 없는 것인가? <No>
-        * onEach는 다시 Flow를 return한다. -> 이후에 다른 operator 사용 가능
+        * onEach는 다시 Flow를 return한다. -> 이후에 다른 operator 사용 가능. 즉, terminal operator가 아니며 이것만으로는 소비자 측에서 데이터를 발행받을 수 없다는 차이가 있다.
           ```
           /**
           Returns a flow that invokes the given [action] **before** each value of the upstream flow is emitted downstream.
@@ -131,7 +134,7 @@
           }
           ```
 
-        * 반면 collect는 아무것도 return하지 않음. -> collect 쓰면 끝.
+        * 반면 collect는 아무것도 return하지 않음. -> collect 쓰면 더 이상 다른 연산자를 쓸 수 없으며, 소비자 측에서 데이터를 발행받을 수 있게 된다.
           ```
           public suspend fun collect(collector: FlowCollector<T>)
           ```
@@ -151,12 +154,20 @@
         }
         ```
 
+        cf) onEach와 함께 사용할 수 있는 launchIn(scope명)
+        * 본래 생산자와 소비자는 같은 코루틴을 공유한다.
+        * 기본적으로 collect 연산자를 사용하면, 생산자 측에서 시간이 오래 걸리는 작업을 수행하는 경우 소비자에서 진행되어야 할 작업(UI 처리, 생산자로부터 emit된 값 collect 등)들은 일시 정지되고, 반대로 소비자 측에서 시간이 오래 걸리는 작업들을 하면 생산자 측에서 진행되어야 할 작업들(데이터 연산 및 발행 등)의 작업들이 일시 정지된다. 이는 생산자와 소비자가 같은 코루틴 영역을 사용하기 때문인 것이다.
+        * 따라서, 소비자가 별도의 코루틴을 사용할 수 있도록 하는 것이 바로 launchIn()인데, 내부에 매개변수로 flow 값들을 collect를 실시할 코루틴 scope를 정의하면 두 주체는 다른 코루틴 상에서 실행된다.
+        * 또한, launchIn()은 terminal operator로서, 중간 연산자인 onEach만으로는 flow에서 발행되는 값들을 받아올 수 없다는 측면에서 onEach를 사용하여 데이터를 발행받고자 할 때에 필수적인 연산자이다.
+
   * terminal operators : terminate the flow - take the whole results of a flow -> all emissions together and then do something with these
+    * collect
+    * single
     * count : 발행되는 것들 중 특정 조건에 맞는 값의 수를 카운트
       쓰는 순간 flow는 종료되며, return하는 것이 Flow가 아닌 Int.
       즉, 마지막에 count를 쓰는 flow라면 어떤 변수에 할당되어야 함.
 
-```
+      ```
       private fun collectFlow() {
           viewModelScope.launch {
               val count = countDownFlow
@@ -180,7 +191,7 @@
               println("count is $count")
           }
       }
-```
+      ```
 
     * reduce
       * every single emission
