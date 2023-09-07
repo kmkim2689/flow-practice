@@ -47,42 +47,52 @@
     * notify the change to UI
     
   * How to make a Flow?
+    
     * flow variable
 
-          val countDownFlow = flow<Int> {
-            // FlowCollector
-            // inside of this block, we can emit a value
-            // kind of coroutine scope => can execute suspend functions in it
+       ```
+       val countDownFlow = flow<Int> {
+         // FlowCollector
+         // inside of this block, we can emit a value
+         // kind of coroutine scope => can execute suspend functions in it
       
-            // starting value
-            val startingValue = 10
-            var currentValue = startingValue
+         // starting value
+         val startingValue = 10
+         var currentValue = startingValue
       
-            // without this code, the timer would start with 9
-            emit(startingValue)
+         // without this code, the timer would start with 9
+         emit(startingValue)
       
-            // loop is needed... for counting down
-            while (currentValue > 0) {
-              delay(1000L)
-              currentValue--
-              // 'notify' the UI about the change by using emit()
-              // here we can put the integer value that we used to declare a flow value
-              emit(currentValue)
-            }
-          }
+         // loop is needed... for counting down
+         while (currentValue > 0) {
+           delay(1000L)
+           currentValue--
+           // 'notify' the UI about the change by using emit()
+           // here we can put the integer value that we used to declare a flow value
+           emit(currentValue)
+         }
+       }
+       ```
   
     * get value from flow variable
     
       * UI Layer : collectAsState
 
-            val time = viewModel.countDownFlow.collectAsState(initial = 10)
-              Box(modifier = Modifier.fillMaxSize()) {
-              Text(
-                text = time.value.toString(),
-                fontSize = 30.sp,
-                modifier = Modifier.align(Alignment.Center)
-              )
-            }
+      ```
+      val time = viewModel.countDownFlow.collectAsState(initial = 10)
+      Box(modifier = Modifier.fillMaxSize()) {
+        Text(
+          text = time.value.toString(),
+          fontSize = 30.sp,
+          modifier = Modifier.align(Alignment.Center)
+        )
+      }
+      ```
+   
+      cf) Why initial value should be set while using collectAsState?
+      * to ensure that consumer can make use of the flow even nothing was emitted from the producer
+      * If nothing was emitted from the flow or nothing is going to be emitted from the flow(null), the initial value is set for that variable so that consumer can make use of this
+      * By the time the first value is emitted from the flow, the initial value will be the state value of the variable
 
       * Business Logic : collect / collectLatest
 
@@ -111,6 +121,7 @@
       * 예시 : 단순 출력
       * 그러면 collect와 다를 바가 없는 것인가? <No>
         * onEach는 다시 Flow를 return한다. -> 이후에 다른 operator 사용 가능
+          ```
           /**
           Returns a flow that invokes the given [action] **before** each value of the upstream flow is emitted downstream.
           **/
@@ -118,26 +129,34 @@
             action(value)
             return@transform emit(value)
           }
+          ```
 
         * 반면 collect는 아무것도 return하지 않음. -> collect 쓰면 끝.
+          ```
           public suspend fun collect(collector: FlowCollector<T>)
+          ```
 
       * 둘은 같은 결과
+        ```
         countDownFlow.onEach {
           println(it)
         }.launchIn(viewModelScope)
-
+        ```
+     
+        ```
         viewModelScope.launch {
           countDownFlow.collect {
             println(it)
           }
         }
+        ```
 
   * terminal operators : terminate the flow - take the whole results of a flow -> all emissions together and then do something with these
     * count : 발행되는 것들 중 특정 조건에 맞는 값의 수를 카운트
       쓰는 순간 flow는 종료되며, return하는 것이 Flow가 아닌 Int.
       즉, 마지막에 count를 쓰는 flow라면 어떤 변수에 할당되어야 함.
 
+```
       private fun collectFlow() {
           viewModelScope.launch {
               val count = countDownFlow
@@ -161,6 +180,7 @@
               println("count is $count")
           }
       }
+```
 
     * reduce
       * every single emission
@@ -191,7 +211,8 @@
         * 앞의 것이 emit되는 동안 새로운 flow에 대한 요청이 들어오면 중단하고 새로운 것에 대해 emit 실시
 
   * buffer
-    
+
+    ```
     private fun collectFlow() {
     val flow = flow {
         // 레스토랑에서 음식을 기다림
@@ -203,7 +224,7 @@
         delay(100L)
         emit("desert")
     }
-
+    
     viewModelScope.launch {
         flow.onEach {
                 println("FLOW : $it is delivered")
@@ -231,6 +252,7 @@
         Flow : finished eating desert
         
     }
+    ```
 
   * conflate : 'skip entirely' if previous collect is not finished
   * collectLatest : 'suspend and skip' if previous collect is not yet finished
