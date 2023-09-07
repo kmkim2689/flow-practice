@@ -159,10 +159,13 @@
         * 기본적으로 collect 연산자를 사용하면, 생산자 측에서 시간이 오래 걸리는 작업을 수행하는 경우 소비자에서 진행되어야 할 작업(UI 처리, 생산자로부터 emit된 값 collect 등)들은 일시 정지되고, 반대로 소비자 측에서 시간이 오래 걸리는 작업들을 하면 생산자 측에서 진행되어야 할 작업들(데이터 연산 및 발행 등)의 작업들이 일시 정지된다. 이는 생산자와 소비자가 같은 코루틴 영역을 사용하기 때문인 것이다.
         * 따라서, 소비자가 별도의 코루틴을 사용할 수 있도록 하는 것이 바로 launchIn()인데, 내부에 매개변수로 flow 값들을 collect를 실시할 코루틴 scope를 정의하면 두 주체는 다른 코루틴 상에서 실행된다.
         * 또한, launchIn()은 terminal operator로서, 중간 연산자인 onEach만으로는 flow에서 발행되는 값들을 받아올 수 없다는 측면에서 onEach를 사용하여 데이터를 발행받고자 할 때에 필수적인 연산자이다.
+        * 만약 생산자와 소비자를 같은 코루틴에서 실행시키고자 한다면, onEach와 collect()를 함께 사용할 수도 있다.
 
-  * terminal operators : terminate the flow - take the whole results of a flow -> all emissions together and then do something with these
+  * terminal operators : terminate the flow - take the whole results of a flow -> all emissions together and then do something with these / actually start the flow on the consumer side by connecting the flow builder, operators with the collector.
+    
     * collect
-    * single
+    * single / first
+    * forEach (!= onEach)
     * count : 발행되는 것들 중 특정 조건에 맞는 값의 수를 카운트
       쓰는 순간 flow는 종료되며, return하는 것이 Flow가 아닌 Int.
       즉, 마지막에 count를 쓰는 flow라면 어떤 변수에 할당되어야 함.
